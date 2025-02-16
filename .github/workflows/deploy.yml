@@ -1,4 +1,4 @@
-name: CD Pipeline
+name: Deploy
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 
 jobs:
   deploy:
+    name: deploy
     runs-on: ubuntu-latest
 
     steps:
@@ -22,19 +23,11 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SSH_HOST }} << 'EOF'
-            export PATH=/bin:/usr/bin:$PATH  # Ensure all commands work
-            
-            # Ensure repo exists
-            if [ ! -d "fastapi-book-project" ]; then
-              git clone https://github.com/Tina-Tech-Code/fastapi-book-project.git
-            fi
-            
-            cd fastapi-book-project
-            git pull origin main
-            
-            # Restart services
-            docker-compose down
-            docker-compose up -d --build
-            sudo systemctl restart nginx
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.SSH_HOST }} << 'EOF'
+          cd /home/ubuntu/fastapi-app
+          git pull origin main
+          source venv/bin/activate
+          pip install -r requirements.txt
+          sudo systemctl restart fastapi
+          sudo systemctl restart nginx
           EOF
