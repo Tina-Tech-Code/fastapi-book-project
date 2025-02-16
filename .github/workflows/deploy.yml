@@ -1,26 +1,40 @@
-name: CI Pipeline
+name: CD Pipeline
 
 on:
-  pull_request:
+  push:
     branches:
       - main
 
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install dependencies
+      - name: Set up SSH
         run: |
-          pip install -r requirements.txt
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H 98.81.94.0 >> ~/.ssh/known_hosts
 
-      - name: Run tests
+      - name: Deploy to EC2
         run: |
-          pytest
+          ssh ubuntu@98.81.94.0 << 'EOF'
+            export PATH=/bin:/usr/bin:$PATH  # Ensure all commands work
+            
+            # Ensure repo exists
+            if [ ! -d "fastapi-book-project" ]; then
+              git clone https://github.com/Tina-Tech-Code/fastapi-book-project.git
+            fi
+            
+            cd fastapi-book-project
+            git pull origin main
+            
+            # Restart services
+            docker-compose down
+            docker-compose up -d --build
+            sudo systemctl restart nginx
+          EOF
